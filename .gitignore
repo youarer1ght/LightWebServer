@@ -1,0 +1,23 @@
+# 编译产物
+server
+*.o
+*.a
+*.so
+*.exe
+*.out
+*.app
+
+# 构建目录
+build/
+cmake-build-*/
+bin/
+obj/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
