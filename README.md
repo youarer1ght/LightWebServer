@@ -1,103 +1,80 @@
-# Computer Network - Socket Programming
+# Lab8 - 轻量化 Web 服务器
 
-## Introduction
+## 项目介绍
 
-This is a simple to somewhat crude web server project for the course Computer Network. The project has implemented a simple web server, which can respond to the request from the client (like a browser).
+本项目实现了一个基于 Linux 的高性能 HTTP 服务器，采用现代 C++ 开发，支持 HTML、图片和文本等静态文件服务，能够解析并处理 GET 和 POST 类型的 HTTP 协议。整体采用 CMake 构建系统，模块化设计，支持高并发连接处理。
 
-The directory structure is as follows:
+## 技术特性
+- 使用 epoll 实现高效的事件驱动模型
+- 非阻塞 I/O 操作，避免线程忙等待
+- 异步任务处理，提高资源利用率
+
+## 平台兼容性
+开发与测试环境：wsl2 & ubuntu 22.04
+不支持的平台：macOS 和 Windows （由于 epoll 是 Linux 独有机制）
+- 如需移植，可以考虑使用 select、poll 代替 epoll
+
+## 项目结构
 
 ``` text
-zjucn-webserver/
-├── assets
-│   ├── html
-│   │   ├── noimg.html
-│   │   └── test.html
-│   ├── img
-│   │   ├── favicon.ico
-│   │   └── logo.jpg
-│   └── txt
-│       └── test.txt
-├── include
-│   ├── def.hpp
-│   ├── Map.hpp
-│   ├── Message.hpp
-│   ├── Queue.hpp
-│   ├── Receiver.hpp
-│   └── Sender.hpp
-├── lib
+WebServer/
+├── assets/                         # 静态资源
+│   ├── html/                       
+│   │   ├── noimg.html              # 无图片测试界面
+│   │   └── test.html               # 测试页面
+│   ├── img/                        
+│   │   └── logo.jpg                # 网站logo
+│   └── txt/                        
+│       └── test.txt                # 测试文本文件
+├── include/                        # 公共库头文件
+│   ├── def.hpp                     # 网络相关定义
+│   ├── Map.hpp                     # Map工具类声明
+│   ├── Message.hpp                 # 消息类声明
+│   ├── Queue.hpp                   # 队列工具类声明
+│   ├── Receiver.hpp                # 接收器类声明
+│   └── Sender.hpp                  # 发送器类声明
+├── lib/
 │   ├── Makefile
-│   ├── Message.cpp
-│   ├── Receiver.cpp
-│   └── Sender.cpp
+│   ├── Message.cpp                 # 消息类实现
+│   ├── Receiver.cpp                # 接收器类实现
+│   └── Sender.cpp                  # 发送器类实现
 ├── Makefile
 ├── Readme.md
 └── src
     ├── include
-    │   └── Server.hpp
+    │   └── Server.hpp              # 服务器类声明
     ├── Makefile
     └── server
-        ├── main.cpp
+        ├── main.cpp                # 程序入口
         ├── Makefile
-        └── Server.cpp
+        └── Server.cpp              # 服务器实现
 ```
 
-## Usage
+## 构建与运行
+### 环境要求
+- Ubuntu 22.04+
+- CMake 3.12+
+- GCC & G++
 
-This project is developed and tested on Arch Linux (6.6.2-arch1-1). MacOS and Windows are not supported since `epoll` is not supported on these platforms.
-
-> ~~It seems epoll is not necessary for this project since the server can handle multiple clients by creating multiple threads. However, I still use epoll to implement the server since it is a good practice.~~
-> Here I use `epoll` to poll the socket with some certain timeout in order to avoid the busy waiting while receiving the message non-blockingly.
-> If you want to transfer the project to other platforms, you can try to ~~remove the epoll part (or~~ use `select` `poll` instead of `epoll` ~~)~~. It should work. :)
-> Moreover, in this project, I use `future` in main function to wait for user's input. It can be replaced by `select` `poll` `epoll` to wait for both user's input and message queue.
-
-### Compile
-
-By using Makefile, you can compile the project by:
-
-``` bash
+### 编译步骤
+```bash
 make
 ```
+在根目录下生成可执行文件server
 
-This will make the server and client in the root directory with the name `server.out`.
-
-### Server
-
-``` bash
-./server.out [host] [address] [port]    # Need to provide in sequence
+### 运行服务器
+```bash
+./server [服务器名称] [主机地址] [端口号]
+# 示例：监听名称 zzz 的本地 6025 端口
+./server zzz 127.0.0.1 6025
 ```
 
-> Graceful exit has been implemented in the server.
-
-## Implementation
-
-### Message, Request & Response
-
-Message class is used to be the base class of Request and Response. Request and Response are used to encapsulate the request and response message.
-
-``` cpp
-class Message {
-private:
-    std::string version_;
-    std::string body_;
-    std::unordered_map<std::string, std::string> headers_;
-}
-
-class Request : public Message {
-private:
-    MethodTypes method_type_;
-    std::string url_;
-}
-
-class Response : public Message {
-private:
-    StatusCodes status_code_;
-}
-```
-
-### Sender & Receiver
-
-Sender and Receiver class are used to encapsulate the sender and receiver methods.
-
+## 核心实现
+### Message
+定义及实现 HTTP 消息、方法类，消息基类 Message，请求类 Request，响应类 Response及相关辅助函数。
+### Receiver & Sender
+Receiver 采用 epoll 边缘触发模式处理网络数据接收，Sender 将 HTTP 响应发送回客户端，支持分块发送大数据。
 ### Server
-
-What the server does is to receive the request from the client and send the response back to the client.
+监听端口，接受客户端连接，为每个连接创建独立的 Receiver/Sender，根据请求 URL 提供静态文件，生成符合 HTTP 标准的响应，支持多客户端同时访问。
+### Map & Queue
+设计实现线程安全的容器模板类。Map接受外部的锁，支持多个操作在同一锁保护下原子执行，适用于需要复合操作的并发场景。Queue内部自动加锁，提供基础的入队、出队操作，适用于生产者-消费者模型。

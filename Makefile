@@ -14,5 +14,5 @@ all:
 clean:
 	${MAKE} -C lib clean
 	${MAKE} -C src clean
-	$(shell rm -rf ./*.out)
+	$(shell rm -rf server)
 	@echo -e '\n'Clean Finished
